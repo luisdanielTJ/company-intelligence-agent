@@ -92,24 +92,29 @@ async def analyze_company(request: AnalysisRequest):
 # ---------------------------------------------------------------------------
 
 def _run_analysis(company_name: str):
-    """Generator — shows a progress message, then yields the final report."""
+    """Generator — shows a progress message, then yields the final report + button state."""
     company_name = company_name.strip()
     if not company_name:
-        yield "Please enter a company name."
+        yield "Please enter a company name.", gr.update(visible=False)
         return
 
     yield (
         f"## Analyzing **{company_name}**...\n\n"
         "- ⚙️ **Researcher** → Analyst → Writer\n\n"
-        "_This takes 30–90 seconds._"
+        "_This takes 30–90 seconds._",
+        gr.update(visible=False),
     )
 
     try:
         report = CompanyIntelligenceCrew().run(company_name)
-        yield report
+        yield report, gr.update(visible=True)
     except Exception as exc:
         logger.error("Crew error: %s", exc)
-        yield f"**Error:** {exc}\n\nPlease check your API keys and try again."
+        yield f"**Error:** {exc}\n\nPlease check your API keys and try again.", gr.update(visible=True)
+
+
+def _reset():
+    return "", "", gr.update(visible=False)
 
 
 with gr.Blocks(
@@ -141,6 +146,8 @@ with gr.Blocks(
         elem_classes=["output-markdown"],
     )
 
+    new_search_btn = gr.Button("New Search", visible=False, variant="secondary")
+
     gr.Examples(
         examples=[["Tesla"], ["Stripe"], ["Anthropic"], ["Shopify"]],
         inputs=company_input,
@@ -154,8 +161,15 @@ with gr.Blocks(
     )
 
     # concurrency_limit=2 — max 2 analyses run simultaneously; extras queue
-    submit_btn.click(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
-    company_input.submit(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
+    submit_btn.click(
+        fn=_run_analysis, inputs=company_input, outputs=[output, new_search_btn], concurrency_limit=2
+    )
+    company_input.submit(
+        fn=_run_analysis, inputs=company_input, outputs=[output, new_search_btn], concurrency_limit=2
+    )
+    new_search_btn.click(
+        fn=_reset, outputs=[company_input, output, new_search_btn]
+    )
 
 
 # Mount Gradio onto FastAPI — Gradio serves at "/" and Swagger at "/docs"
