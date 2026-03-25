@@ -92,29 +92,28 @@ async def analyze_company(request: AnalysisRequest):
 # ---------------------------------------------------------------------------
 
 def _run_analysis(company_name: str):
-    """Generator — shows a progress message, then yields the final report + button state."""
+    """Generator — shows a progress message, then yields the final report."""
     company_name = company_name.strip()
     if not company_name:
-        yield "Please enter a company name.", gr.update(visible=False)
+        yield "Please enter a company name."
         return
 
     yield (
         f"## Analyzing **{company_name}**...\n\n"
         "- ⚙️ **Researcher** → Analyst → Writer\n\n"
-        "_This takes 30–90 seconds._",
-        gr.update(visible=False),
+        "_This takes 30–90 seconds._"
     )
 
     try:
         report = CompanyIntelligenceCrew().run(company_name)
-        yield report, gr.update(visible=True)
+        yield report.strip()
     except Exception as exc:
         logger.error("Crew error: %s", exc)
-        yield f"**Error:** {exc}\n\nPlease check your API keys and try again.", gr.update(visible=True)
+        yield f"**Error:** {exc}\n\nPlease check your API keys and try again."
 
 
 def _reset():
-    return "", "", gr.update(visible=False)
+    return "", gr.update(visible=False)
 
 
 with gr.Blocks(
@@ -143,6 +142,7 @@ with gr.Blocks(
 
     output = gr.Markdown(
         label="Intelligence Report",
+        sanitize_html=False,
         elem_classes=["output-markdown"],
     )
 
@@ -160,15 +160,19 @@ with gr.Blocks(
         """
     )
 
-    # concurrency_limit=2 — max 2 analyses run simultaneously; extras queue
+    # .then() fires after the generator finishes — shows the New Search button
     submit_btn.click(
-        fn=_run_analysis, inputs=company_input, outputs=[output, new_search_btn], concurrency_limit=2
+        fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2
+    ).then(
+        fn=lambda: gr.update(visible=True), outputs=new_search_btn
     )
     company_input.submit(
-        fn=_run_analysis, inputs=company_input, outputs=[output, new_search_btn], concurrency_limit=2
+        fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2
+    ).then(
+        fn=lambda: gr.update(visible=True), outputs=new_search_btn
     )
     new_search_btn.click(
-        fn=_reset, outputs=[company_input, output, new_search_btn]
+        fn=_reset, outputs=[company_input, new_search_btn]
     )
 
 
