@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import queue
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -93,73 +91,25 @@ async def analyze_company(request: AnalysisRequest):
 # Gradio UI — mounted on FastAPI at "/"
 # ---------------------------------------------------------------------------
 
-_AGENT_STAGES = [
-    ("Researcher", "Searching the web and gathering company data..."),
-    ("Analyst",    "Analyzing research and extracting business insights..."),
-    ("Writer",     "Composing the intelligence report..."),
-]
-
-
 def _run_analysis(company_name: str):
-    """Generator — yields live status updates then the final report."""
+    """Generator — shows a progress message, then yields the final report."""
     company_name = company_name.strip()
     if not company_name:
         yield "Please enter a company name."
         return
 
-    updates: queue.Queue = queue.Queue()
-    completed_tasks = [0]
+    yield (
+        f"## Analyzing **{company_name}**...\n\n"
+        "- ⚙️ **Researcher** → Analyst → Writer\n\n"
+        "_This takes 30–90 seconds._"
+    )
 
-    def on_task_complete(_task_output):
-        completed_tasks[0] += 1
-        idx = completed_tasks[0]
-        if idx < len(_AGENT_STAGES):
-            agent, action = _AGENT_STAGES[idx]
-            updates.put(("status", agent, action))
-
-    def run_crew():
-        try:
-            result = CompanyIntelligenceCrew().run(company_name, on_task_complete=on_task_complete)
-            updates.put(("done", result, ""))
-        except Exception as exc:
-            logger.error("Crew error: %s", exc)
-            updates.put(("error", str(exc), ""))
-
-    thread = threading.Thread(target=run_crew, daemon=True)
-    thread.start()
-
-    def status_md(agent: str, action: str) -> str:
-        lines = []
-        for i, (a, _) in enumerate(_AGENT_STAGES):
-            if a == agent:
-                lines.append(f"- ⚙️ **{a}** — {action}")
-            elif i < _AGENT_STAGES.index((agent, action)):
-                lines.append(f"- ✅ **{a}** — done")
-            else:
-                lines.append(f"- ⏳ **{a}**")
-        return (
-            f"## Analyzing **{company_name}**...\n\n"
-            + "\n".join(lines)
-            + "\n\n_This takes 30–90 seconds._"
-        )
-
-    first_agent, first_action = _AGENT_STAGES[0]
-    yield status_md(first_agent, first_action)
-
-    while True:
-        try:
-            msg_type, payload, extra = updates.get(timeout=120)
-            if msg_type == "status":
-                yield status_md(payload, extra)
-            elif msg_type == "done":
-                yield payload
-                break
-            elif msg_type == "error":
-                yield f"**Error:** {payload}\n\nPlease check your API keys and try again."
-                break
-        except queue.Empty:
-            yield "**Timeout:** The analysis took too long. Please try again."
-            break
+    try:
+        report = CompanyIntelligenceCrew().run(company_name)
+        yield report
+    except Exception as exc:
+        logger.error("Crew error: %s", exc)
+        yield f"**Error:** {exc}\n\nPlease check your API keys and try again."
 
 
 with gr.Blocks(
