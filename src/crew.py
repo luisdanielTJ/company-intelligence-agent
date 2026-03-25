@@ -41,6 +41,7 @@ class CompanyIntelligenceCrew:
             agents=[researcher, analyst, writer],
             tasks=tasks,
             process=Process.sequential,
+            max_rpm=10,       # cap LLM calls per minute — prevents runaway loops
             verbose=True,
         )
 

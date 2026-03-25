@@ -153,8 +153,9 @@ with gr.Blocks(
         """
     )
 
-    submit_btn.click(fn=_run_analysis, inputs=company_input, outputs=output)
-    company_input.submit(fn=_run_analysis, inputs=company_input, outputs=output)
+    # concurrency_limit=2 — max 2 analyses run simultaneously; extras queue
+    submit_btn.click(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
+    company_input.submit(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
 
 
 # Mount Gradio onto FastAPI — Gradio serves at "/" and Swagger at "/docs"
