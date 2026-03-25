@@ -20,7 +20,7 @@ def create_researcher() -> Agent:
         tools=[search_tool],
         llm=get_llm(),
         verbose=True,
-        max_iter=6,
+        max_iter=3,
     )
 
 

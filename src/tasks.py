@@ -13,11 +13,11 @@ def create_research_task(company: str, researcher: Agent) -> Task:
             "- Financials: revenue, funding rounds, valuation (if available)\n"
             "- Main competitors and market share\n"
             "- Technology stack or infrastructure (if publicly known)\n\n"
-            "Perform at least 3 different searches to ensure comprehensive coverage."
+            "Perform 2 targeted searches. Be concise."
         ),
         expected_output=(
-            "A detailed research summary organized by category, with source references "
-            "and key facts clearly stated for each section."
+            "A bullet-point research summary under 350 words, organized by category. "
+            "Key facts only — no filler."
         ),
         agent=researcher,
     )
@@ -36,8 +36,8 @@ def create_analysis_task(company: str, analyst: Agent) -> Task:
             "Base your analysis strictly on the research provided. Be objective."
         ),
         expected_output=(
-            "A structured analysis with clear findings and reasoning for each category, "
-            "highlighting the most critical insights for decision-makers."
+            "A concise analysis under 250 words, one short paragraph per category. "
+            "Only the most critical insights."
         ),
         agent=analyst,
     )
@@ -58,7 +58,7 @@ def create_report_task(company: str, writer: Agent) -> Task:
             "## Financial Overview\n"
             "## Key Risks & Opportunities\n"
             "## Conclusion\n\n"
-            "Keep each section concise but informative. Use bullet points where appropriate."
+            "Keep each section to 3–5 bullet points maximum. Total report under 600 words."
         ),
         expected_output=(
             f"A complete, well-formatted Markdown intelligence report about {company} "
