@@ -112,9 +112,6 @@ def _run_analysis(company_name: str):
         yield f"**Error:** {exc}\n\nPlease check your API keys and try again."
 
 
-def _reset():
-    return "", gr.update(visible=False)
-
 
 with gr.Blocks(
     title="Company Intelligence Agent",
@@ -146,8 +143,6 @@ with gr.Blocks(
         elem_classes=["output-markdown"],
     )
 
-    new_search_btn = gr.Button("New Search", visible=False, variant="secondary")
-
     gr.Examples(
         examples=[["Tesla"], ["Stripe"], ["Anthropic"], ["Shopify"]],
         inputs=company_input,
@@ -160,20 +155,8 @@ with gr.Blocks(
         """
     )
 
-    # .then() fires after the generator finishes — shows the New Search button
-    submit_btn.click(
-        fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2
-    ).then(
-        fn=lambda: gr.update(visible=True), outputs=new_search_btn
-    )
-    company_input.submit(
-        fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2
-    ).then(
-        fn=lambda: gr.update(visible=True), outputs=new_search_btn
-    )
-    new_search_btn.click(
-        fn=_reset, outputs=[company_input, new_search_btn]
-    )
+    submit_btn.click(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
+    company_input.submit(fn=_run_analysis, inputs=company_input, outputs=output, concurrency_limit=2)
 
 
 # Mount Gradio onto FastAPI — Gradio serves at "/" and Swagger at "/docs"
