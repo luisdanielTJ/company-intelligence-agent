@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import Callable
 
 from crewai import Crew, Process
 
@@ -27,7 +28,7 @@ _init_agentops()
 class CompanyIntelligenceCrew:
     """Orchestrates the multi-agent company research pipeline."""
 
-    def run(self, company: str) -> str:
+    def run(self, company: str, on_task_complete: Callable | None = None) -> str:
         researcher = create_researcher()
         analyst = create_analyst()
         writer = create_writer()
@@ -42,6 +43,7 @@ class CompanyIntelligenceCrew:
             agents=[researcher, analyst, writer],
             tasks=tasks,
             process=Process.sequential,
+            task_callback=on_task_complete,
             verbose=True,
         )
 

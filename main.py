@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import queue
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -33,7 +35,7 @@ fastapi_app = FastAPI(
     title="Company Intelligence Agent",
     description=(
         "An AI-powered multi-agent system built with CrewAI that researches, "
-        "analyzes, and reports on any company. Powered by OpenAI + Serper search."
+        "analyzes, and reports on any company. Powered by OpenAI + DuckDuckGo."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -91,21 +93,73 @@ async def analyze_company(request: AnalysisRequest):
 # Gradio UI — mounted on FastAPI at "/"
 # ---------------------------------------------------------------------------
 
+_AGENT_STAGES = [
+    ("Researcher", "Searching the web and gathering company data..."),
+    ("Analyst",    "Analyzing research and extracting business insights..."),
+    ("Writer",     "Composing the intelligence report..."),
+]
+
+
 def _run_analysis(company_name: str):
-    """Generator that streams status updates then the final report to Gradio."""
+    """Generator — yields live status updates then the final report."""
     company_name = company_name.strip()
     if not company_name:
         yield "Please enter a company name."
         return
 
-    yield f"## Researching **{company_name}**...\n\n_This takes 30–90 seconds. Three AI agents are working in sequence: Researcher → Analyst → Report Writer._"
+    updates: queue.Queue = queue.Queue()
+    completed_tasks = [0]
 
-    try:
-        report = CompanyIntelligenceCrew().run(company_name)
-        yield report
-    except Exception as exc:
-        logger.error("Gradio analysis error: %s", exc)
-        yield f"**Error:** {exc}\n\nPlease check your API keys and try again."
+    def on_task_complete(_task_output):
+        completed_tasks[0] += 1
+        idx = completed_tasks[0]
+        if idx < len(_AGENT_STAGES):
+            agent, action = _AGENT_STAGES[idx]
+            updates.put(("status", agent, action))
+
+    def run_crew():
+        try:
+            result = CompanyIntelligenceCrew().run(company_name, on_task_complete=on_task_complete)
+            updates.put(("done", result, ""))
+        except Exception as exc:
+            logger.error("Crew error: %s", exc)
+            updates.put(("error", str(exc), ""))
+
+    thread = threading.Thread(target=run_crew, daemon=True)
+    thread.start()
+
+    def status_md(agent: str, action: str) -> str:
+        lines = []
+        for i, (a, _) in enumerate(_AGENT_STAGES):
+            if a == agent:
+                lines.append(f"- ⚙️ **{a}** — {action}")
+            elif i < _AGENT_STAGES.index((agent, action)):
+                lines.append(f"- ✅ **{a}** — done")
+            else:
+                lines.append(f"- ⏳ **{a}**")
+        return (
+            f"## Analyzing **{company_name}**...\n\n"
+            + "\n".join(lines)
+            + "\n\n_This takes 30–90 seconds._"
+        )
+
+    first_agent, first_action = _AGENT_STAGES[0]
+    yield status_md(first_agent, first_action)
+
+    while True:
+        try:
+            msg_type, payload, extra = updates.get(timeout=120)
+            if msg_type == "status":
+                yield status_md(payload, extra)
+            elif msg_type == "done":
+                yield payload
+                break
+            elif msg_type == "error":
+                yield f"**Error:** {payload}\n\nPlease check your API keys and try again."
+                break
+        except queue.Empty:
+            yield "**Timeout:** The analysis took too long. Please try again."
+            break
 
 
 with gr.Blocks(
@@ -117,7 +171,7 @@ with gr.Blocks(
     gr.Markdown(
         """
         # Company Intelligence Agent
-        > Powered by **CrewAI** · **OpenAI** · **Serper**
+        > Powered by **CrewAI** · **OpenAI** · **DuckDuckGo**
 
         Enter any company name and get a comprehensive AI-generated intelligence report
         covering market position, recent news, financials, risks, and opportunities.
