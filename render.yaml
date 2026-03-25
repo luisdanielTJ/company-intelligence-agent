@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: company-intelligence-agent
+    env: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false          # Set manually in Render dashboard
+      - key: AGENTOPS_API_KEY
+        sync: false          # Optional
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
